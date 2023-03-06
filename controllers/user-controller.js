@@ -42,7 +42,11 @@ const userController = {
   getUser: (req, res, next) => {
     return Promise.all([
       User.findByPk(req.params.id, {
-        raw: true
+        include: [
+          { model: User, as: 'Followers' },
+          { model: User, as: 'Followings' },
+          { model: Restaurant, as: 'FavoritedRestaurants' }
+        ]
       }),
       Comment.findAll({
         raw: true,
@@ -53,8 +57,21 @@ const userController = {
     ])
       .then(([user, comments]) => {
         if (!user) throw new Error("User didn't exist")
-        const commentCounts = comments.length
-        res.render('users/profile', { user, comments, commentCounts })
+        const userResult = {
+          ...user.toJSON(),
+          favoriteCounts: user.FavoritedRestaurants.length,
+          followingCounts: user.Followings.length,
+          followerCounts: user.Followers.length
+        }
+        // 過濾掉重複評論的餐廳
+        const commentResult = []
+        comments.forEach(comment => {
+          if (!commentResult.some(cr => cr.Restaurant.id === comment.Restaurant.id)) {
+            commentResult.push(comment)
+          }
+        })
+        const commentCounts = commentResult.length
+        res.render('users/profile', { user: userResult, comments: commentResult, commentCounts })
       })
       .catch(err => next(err))
   },
