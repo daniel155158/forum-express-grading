@@ -11,25 +11,25 @@ const restaurantController = {
 
     return Promise.all([
       Restaurant.findAndCountAll({
-        include: Category,
+        include: [
+          Category,
+          { model: User, as: 'FavoritedUsers' },
+          { model: User, as: 'LikedUsers' }
+        ],
         where: { // 新增查詢條件
           ...categoryId ? { categoryId } : {} // 檢查 categoryId 是否為空值
         },
         limit,
-        offset,
-        nest: true,
-        raw: true
+        offset
       }),
       Category.findAll({ raw: true })
     ])
       .then(([restaurants, categories]) => {
-        const favoritedRestaurantsId = req.user && req.user.FavoritedRestaurants.map(fr => fr.id)
-        const likedRestaurantsId = req.user && req.user.LikedRestaurants.map(lr => lr.id)
         const data = restaurants.rows.map(r => ({
-          ...r,
+          ...r.toJSON(),
           description: r.description.substring(0, 50),
-          isFavorited: favoritedRestaurantsId.includes(r.id),
-          isLiked: likedRestaurantsId.includes(r.id)
+          isFavorited: r.FavoritedUsers.some(f => f.id === req.user.id),
+          isLiked: r.LikedUsers.some(l => l.id === req.user.id)
         }))
         return res.render('restaurants', {
           restaurants: data,
